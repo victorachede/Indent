@@ -61,8 +61,9 @@ else
       ASSETS="null"
     fi
   else
-    echo "can't check assets"
-    exit 1
+    echo "no releases yet, forcing build"
+    export SHOULD_BUILD="yes"
+    ASSETS="[]"
   fi
 fi
 
