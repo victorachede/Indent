@@ -18,6 +18,7 @@ env:
   OS_NAME: linux
   VERSIONS_REPOSITORY: ${{ github.repository_owner }}/Indent-versions
   VSCODE_QUALITY: stable
+  SHOULD_DEPLOY: "no"
 
 jobs:
   check:
