@@ -193,7 +193,7 @@ fi
 
 cd "${REPOSITORY_NAME}" || { echo "'${REPOSITORY_NAME}' dir not found"; exit 1; }
 
-git pull origin master # in case another build just pushed
+git pull origin main # in case another build just pushed
 git add .
 
 CHANGES=$( git status --porcelain )
@@ -205,9 +205,9 @@ if [[ -n "${CHANGES}" ]]; then
 
   git commit -m "CI update: ${dateAndMonth} (Build ${GITHUB_RUN_NUMBER})"
 
-  if ! git push origin master --quiet; then
-    git pull origin master
-    git push origin master --quiet
+  if ! git push origin main --quiet; then
+    git pull origin main
+    git push origin main --quiet
   fi
 else
   echo "No changes"
