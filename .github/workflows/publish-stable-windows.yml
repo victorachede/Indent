@@ -204,7 +204,7 @@ jobs:
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 28800
           output-artifact-directory: assets/
-        if: env.SHOULD_BUILD == 'yes' && secrets.SIGNPATH_API_TOKEN != ''
+        if: env.SHOULD_BUILD == 'yes' && vars.SIGNPATH_ENABLED == 'true'
 
       - name: Prepare checksums
         run: ./prepare_checksums.sh
