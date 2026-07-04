@@ -5,42 +5,56 @@
 <h1 align="center">Indent</h1>
 
 <p align="center">
-  The code editor built for developers the industry forgot.
+  The code editor that builds with you, deploys for you, and doesn't charge you in dollars.
 </p>
 
 ---
 
-Indent is a fully agentic code editor for African developers — and anyone else tired of tools that weren't built with them in mind.
+Cursor is a great editor. Built for San Francisco. Priced for San Francisco. Deployed for San Francisco.
 
-No autocomplete. No hand-holding. You describe what you want to build, Indent builds it. You stay in control of what ships.
-
-Built on open source. Priced for the real world. Designed to work where the internet doesn't cooperate.
+Indent is not.
 
 ---
 
-## Why
+## What Indent is
 
-Every major editor is built in San Francisco, priced in dollars, and optimized for gigabit internet. Indent is not.
-
-We're building the tool we always needed — fast, agentic, Africa-first pricing, and honest about what AI can and can't do.
+A fully agentic code editor built on VSCodium. Use it as your daily IDE — all your extensions, your git, your terminal, everything works. Then switch to task mode when you want to actually build something fast.
 
 ---
 
-## What's different
+## What makes it different
 
-- **Task-based, not autocomplete** — you give the goal, Indent handles the execution
-- **Africa-first pricing** — not a discount. the actual price.
-- **Secure credential handling** — your keys stay yours
-- **Built on VSCodium** — open source to the bone
+**Task mode**
+Describe what you want. The agent plans it, edits across your files, and shows you every change as a diff — accept or reject, line by line. Nothing ships without your eyes on it.
+
+**Ship from the editor**
+Connect Vercel and Supabase once. When you're done, deploy without leaving Indent. No terminal switching. No copy-pasting env vars. Idea to production in one session.
+
+**Credential vault**
+Your API keys, tokens, and secrets stay encrypted on your machine. They never touch a server.
+
+**Local currency billing**
+Pay in NGN, KES, GHS, ZAR — whatever your local currency is. No dollar card. No conversion fees. An actual fair price for where you actually live.
+
+**VSCodium base**
+Open source. No Microsoft telemetry. No license games. Your code stays yours.
+
+---
+
+## What it feels like
+
+You open a task. You type what you want to build. Indent works across your files while you watch — diffs streaming in, file tree lighting up. You accept what's right, reject what isn't. You hit ship. It's live.
+
+That's it. That's the whole thing.
 
 ---
 
 ## Status
 
-Early. Building in public. CI is green (mostly).
+v1 in active development. Vercel and Supabase integrations shipping first.
 
 ---
 
 <p align="center">
-  <sub>Black Sheep Co. — we build what we need.</sub>
+  <sub>Black Sheep Co. — built by the ones who weren't supposed to.</sub>
 </p>
