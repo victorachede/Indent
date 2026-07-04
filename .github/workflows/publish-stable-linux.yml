@@ -18,6 +18,8 @@ env:
   OS_NAME: linux
   VERSIONS_REPOSITORY: ${{ github.repository_owner }}/Indent-versions
   VSCODE_QUALITY: stable
+  SHOULD_BUILD_REH: "no"
+  SHOULD_BUILD_REH_WEB: "no"
   SHOULD_DEPLOY: "no"
 
 jobs:
