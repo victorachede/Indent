@@ -20,7 +20,7 @@ env:
   VSCODE_QUALITY: stable
   SHOULD_BUILD_REH: "no"
   SHOULD_BUILD_REH_WEB: "no"
-  SHOULD_DEPLOY: "no"
+  SHOULD_DEPLOY: "yes"
 
 jobs:
   check:
