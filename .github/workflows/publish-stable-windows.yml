@@ -151,6 +151,11 @@ jobs:
           python-version: '3.11'
         if: env.SHOULD_BUILD == 'yes'
 
+      - name: Install WiX Toolset
+        run: choco install wixtoolset -y
+        shell: cmd
+        if: env.SHOULD_BUILD == 'yes' && matrix.vscode_arch == 'x64'
+
       - name: Check existing Indent tags/releases
         env:
           DISABLE_MSI: ${{ vars.DISABLE_STABLE_MSI }}
@@ -197,10 +202,9 @@ jobs:
           github-artifact-id: ${{ steps.upload-unsigned-artifacts.outputs.artifact-id }}
           artifact-configuration-slug: ${{ matrix.vscode_arch }}
           wait-for-completion: true
-          # 8h to manually approve the request
           wait-for-completion-timeout-in-seconds: 28800
           output-artifact-directory: assets/
-        if: env.SHOULD_BUILD == 'yes'
+        if: env.SHOULD_BUILD == 'yes' && secrets.SIGNPATH_API_TOKEN != ''
 
       - name: Prepare checksums
         run: ./prepare_checksums.sh
@@ -248,6 +252,6 @@ jobs:
           identifier: ${{ env.APP_IDENTIFIER }}
           version: ${{ env.RELEASE_VERSION }}
           release-tag: ${{ env.RELEASE_VERSION }}
-          installers-regex: '\.exe$' # only .exe files
+          installers-regex: '\.exe$'
           token: ${{ secrets.STRONGER_GITHUB_TOKEN }}
         if: env.SHOULD_DEPLOY == 'yes'
