@@ -11,7 +11,7 @@ env:
   ASSETS_REPOSITORY: ${{ github.repository }}
   BINARY_NAME: indent
   GH_REPO_PATH: ${{ github.repository }}
-  GITHUB_BRANCH: master
+  GITHUB_BRANCH: main
   ORG_NAME: ${{ github.repository_owner }}
   OS_NAME: windows
   VERSIONS_REPOSITORY: ${{ github.repository_owner }}/Indent-versions
