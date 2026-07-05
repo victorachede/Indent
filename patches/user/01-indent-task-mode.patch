@@ -1,0 +1,490 @@
+diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+--- /dev/null
++++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts
+@@ -0,0 +1,8 @@
++/*---------------------------------------------------------------------------------------------
++ *  Indent – Task Mode constants
++ *--------------------------------------------------------------------------------------------*/
++
++export const INDENT_AGENT_VIEW_ID = 'workbench.view.indentAgent';
++export const INDENT_AGENT_CONTAINER_ID = 'workbench.view.container.indentAgent';
++export const INDENT_AGENT_STATUS_EVENT = 'indent.agent.status';
++export const INDENT_AGENT_RESULT_EVENT = 'indent.agent.result';
+diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+--- /dev/null
++++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts
+@@ -0,0 +1,285 @@
++/*---------------------------------------------------------------------------------------------
++ *  Indent – Task Mode view pane
++ *  Input at bottom, status flickers above it, brief fills the space above that.
++ *--------------------------------------------------------------------------------------------*/
++
++import { $, append, clearNode } from '../../../../base/browser/dom.js';
++import { Disposable } from '../../../../base/common/lifecycle.js';
++import { IViewPaneOptions, ViewPane } from '../../../browser/parts/views/viewPane.js';
++import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
++import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
++import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
++import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
++import { IViewDescriptorService } from '../../../common/views.js';
++import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
++import { IOpenerService } from '../../../../platform/opener/common/opener.js';
++import { IThemeService } from '../../../../platform/theme/common/themeService.js';
++import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { IndentAgentService } from './indentAgentService.js';
++
++const STATUS_MESSAGES = [
++	'reading codebase',
++	'checking docs',
++	'planning',
++	'thinking harder',
++	'picked approach',
++];
++
++export class IndentAgentViewPane extends ViewPane {
++
++	private container!: HTMLElement;
++	private briefArea!: HTMLElement;
++	private statusLine!: HTMLElement;
++	private inputWrapper!: HTMLElement;
++	private textarea!: HTMLTextAreaElement;
++	private submitBtn!: HTMLButtonElement;
++
++	private agentService: IndentAgentService;
++	private statusInterval: ReturnType<typeof setInterval> | undefined;
++	private currentTask = '';
++	private isRunning = false;
++
++	constructor(
++		options: IViewPaneOptions,
++		@IKeybindingService keybindingService: IKeybindingService,
++		@IContextMenuService contextMenuService: IContextMenuService,
++		@IConfigurationService configurationService: IConfigurationService,
++		@IContextKeyService contextKeyService: IContextKeyService,
++		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
++		@IInstantiationService instantiationService: IInstantiationService,
++		@IOpenerService openerService: IOpenerService,
++		@IThemeService themeService: IThemeService,
++		@ITelemetryService telemetryService: ITelemetryService,
++		@IHoverService hoverService: IHoverService,
++	) {
++		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
++		this.agentService = instantiationService.createInstance(IndentAgentService);
++	}
++
++	protected override renderBody(container: HTMLElement): void {
++		super.renderBody(container);
++		this.container = container;
++		container.classList.add('indent-agent-pane');
++
++		// Brief area — fills available space above input
++		this.briefArea = append(container, $('.indent-agent-brief'));
++		this.briefArea.setAttribute('aria-live', 'polite');
++
++		// Status line — single flickering line just above input
++		this.statusLine = append(container, $('.indent-agent-status'));
++		this.statusLine.textContent = '';
++
++		// Input wrapper — anchored to bottom
++		this.inputWrapper = append(container, $('.indent-agent-input-wrapper'));
++
++		this.textarea = append(this.inputWrapper, $('textarea.indent-agent-input')) as HTMLTextAreaElement;
++		this.textarea.placeholder = 'What do you want to build?';
++		this.textarea.rows = 2;
++		this.textarea.setAttribute('aria-label', 'Task input');
++
++		this.submitBtn = append(this.inputWrapper, $('button.indent-agent-submit')) as HTMLButtonElement;
++		this.submitBtn.textContent = '↵';
++		this.submitBtn.setAttribute('aria-label', 'Run task');
++
++		this._register(this.agentService.onStatusUpdate(msg => this.setStatus(msg)));
++		this._register(this.agentService.onBriefReady(brief => this.showBrief(brief)));
++		this._register(this.agentService.onError(err => this.showError(err)));
+
++		this.textarea.addEventListener('keydown', (e) => {
++			if (e.key === 'Enter' && !e.shiftKey) {
++				e.preventDefault();
++				this.runTask();
++			}
++		});
++
++		this.submitBtn.addEventListener('click', () => this.runTask());
++	}
++
++	private runTask(): void {
++		const task = this.textarea.value.trim();
++		if (!task || this.isRunning) { return; }
++		this.currentTask = task;
++		this.isRunning = true;
++		this.textarea.disabled = true;
++		this.submitBtn.disabled = true;
++		clearNode(this.briefArea);
++		this.startStatusFlicker();
++		this.agentService.runTask(task);
++	}
++
++	private startStatusFlicker(): void {
++		let i = 0;
++		this.setStatus(STATUS_MESSAGES[0]);
++		this.statusInterval = setInterval(() => {
++			i = (i + 1) % STATUS_MESSAGES.length;
++			this.setStatus(STATUS_MESSAGES[i]);
++		}, 1800);
++	}
++
++	private stopStatusFlicker(): void {
++		if (this.statusInterval) {
++			clearInterval(this.statusInterval);
++			this.statusInterval = undefined;
++		}
++	}
++
++	private setStatus(msg: string): void {
++		this.statusLine.textContent = msg;
++		this.statusLine.classList.remove('indent-status-fade');
++		void this.statusLine.offsetWidth; // reflow to restart animation
++		this.statusLine.classList.add('indent-status-fade');
++	}
++
++	private showBrief(brief: IAgentBrief): void {
++		this.stopStatusFlicker();
++		this.setStatus('');
++		clearNode(this.briefArea);
++
++		// File list
++		const fileList = append(this.briefArea, $('.indent-brief-files'));
++		const header = append(fileList, $('.indent-brief-header'));
++		header.textContent = `${brief.files.length} file${brief.files.length !== 1 ? 's' : ''}  ·  ${brief.totalChanges} change${brief.totalChanges !== 1 ? 's' : ''}`;
++
++		for (const f of brief.files) {
++			const row = append(fileList, $('.indent-brief-file-row'));
++			const path = append(row, $('.indent-brief-file-path'));
++			path.textContent = f.path;
++			const reason = append(row, $('.indent-brief-file-reason'));
++			reason.textContent = f.reason;
++		}
++
++		// Commendation if present
++		if (brief.commendation) {
++			const note = append(this.briefArea, $('.indent-brief-commendation'));
++			note.textContent = brief.commendation;
++		}
+
++		// Action buttons
++		const actions = append(this.briefArea, $('.indent-brief-actions'));
++
++		const editBtn = append(actions, $('button.indent-brief-btn-secondary')) as HTMLButtonElement;
++		editBtn.textContent = 'Edit plan';
++		editBtn.addEventListener('click', () => this.resetToInput());
++
++		const goBtn = append(actions, $('button.indent-brief-btn-primary')) as HTMLButtonElement;
++		goBtn.textContent = 'Go';
++		goBtn.addEventListener('click', () => this.executePlan(brief));
++	}
++
++	private showError(msg: string): void {
++		this.stopStatusFlicker();
++		this.setStatus('');
++		clearNode(this.briefArea);
++		const err = append(this.briefArea, $('.indent-brief-error'));
++		err.textContent = msg;
++		this.resetInputState();
++	}
++
++	private async executePlan(brief: IAgentBrief): Promise<void> {
++		clearNode(this.briefArea);
++		this.setStatus('building');
++		await this.agentService.executePlan(brief);
++		this.setStatus('done');
++		setTimeout(() => this.resetToInput(), 2000);
++	}
++
++	private resetToInput(): void {
++		this.stopStatusFlicker();
++		this.setStatus('');
++		clearNode(this.briefArea);
++		this.resetInputState();
++	}
++
++	private resetInputState(): void {
++		this.isRunning = false;
++		this.textarea.disabled = false;
++		this.submitBtn.disabled = false;
++		this.textarea.value = '';
++		this.textarea.focus();
++	}
++
++	protected override layoutBody(height: number, width: number): void {
++		super.layoutBody(height, width);
++	}
++
++	override dispose(): void {
++		this.stopStatusFlicker();
++		this.agentService.dispose();
++		super.dispose();
++	}
++}
++
++export interface IAgentBrief {
++	files: Array<{ path: string; reason: string }>;
++	totalChanges: number;
++	commendation?: string;
++	rawPlan: string;
++}
+diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccccccccccc
+--- /dev/null
++++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts
+@@ -0,0 +1,175 @@
++/*---------------------------------------------------------------------------------------------
++ *  Indent – Agent service
++ *  Talks to the Claude API, reads workspace files, builds the brief.
++ *--------------------------------------------------------------------------------------------*/
++
++import { Disposable } from '../../../../base/common/lifecycle.js';
++import { Emitter, Event } from '../../../../base/common/event.js';
++import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
++import { IFileService } from '../../../../platform/files/common/files.js';
++import { URI } from '../../../../base/common/uri.js';
++import { VSBuffer } from '../../../../base/common/buffer.js';
++import { IAgentBrief } from './indentAgentViewPane.js';
++
++const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
++const CLAUDE_MODEL = 'claude-sonnet-4-6';
++const MAX_FILE_BYTES = 80_000; // ~80kb per file to stay within context
++const MAX_FILES = 20;
++
++export class IndentAgentService extends Disposable {
++
++	private readonly _onStatusUpdate = this._register(new Emitter<string>());
++	readonly onStatusUpdate: Event<string> = this._onStatusUpdate.event;
++
++	private readonly _onBriefReady = this._register(new Emitter<IAgentBrief>());
++	readonly onBriefReady: Event<IAgentBrief> = this._onBriefReady.event;
++
++	private readonly _onError = this._register(new Emitter<string>());
++	readonly onError: Event<string> = this._onError.event;
++
++	constructor(
++		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
++		@IFileService private readonly fileService: IFileService,
++	) {
++		super();
++	}
++
++	async runTask(task: string): Promise<void> {
++		try {
++			this._onStatusUpdate.fire('reading codebase');
++			const codebaseSnapshot = await this.readWorkspaceFiles();
++
++			this._onStatusUpdate.fire('planning');
++			const brief = await this.callClaude(task, codebaseSnapshot);
++
++			this._onBriefReady.fire(brief);
++		} catch (err: unknown) {
++			const msg = err instanceof Error ? err.message : String(err);
++			this._onError.fire(`Something went wrong: ${msg}`);
++		}
++	}
++
++	private async readWorkspaceFiles(): Promise<string> {
++		const folders = this.workspaceService.getWorkspace().folders;
++		if (!folders.length) { return '(no workspace open)'; }
++
++		const root = folders[0].uri;
++		const files = await this.collectFiles(root, 0);
++		const parts: string[] = [];
++
++		for (const uri of files.slice(0, MAX_FILES)) {
++			try {
++				const content = await this.fileService.readFile(uri);
++				const text = content.value.slice(0, MAX_FILE_BYTES).toString();
++				const rel = uri.path.replace(root.path, '').replace(/^\//, '');
++				parts.push(`=== ${rel} ===\n${text}`);
++			} catch {
++				// skip unreadable files
++			}
++		}
++
++		return parts.join('\n\n');
++	}
++
++	private async collectFiles(dir: URI, depth: number): Promise<URI[]> {
++		if (depth > 4) { return []; }
++		const results: URI[] = [];
++		try {
++			const stat = await this.fileService.resolve(dir);
++			if (!stat.children) { return []; }
++			for (const child of stat.children) {
++				if (this.shouldSkip(child.name)) { continue; }
++				if (child.isDirectory) {
++					results.push(...await this.collectFiles(child.resource, depth + 1));
++				} else if (this.isSourceFile(child.name)) {
++					results.push(child.resource);
++				}
++			}
++		} catch {
++			// skip
++		}
++		return results;
++	}
++
++	private shouldSkip(name: string): boolean {
++		return ['node_modules', '.git', 'dist', 'build', '.next', 'out', '.cache', 'coverage'].includes(name);
++	}
++
++	private isSourceFile(name: string): boolean {
++		return /\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|css|scss|html|json|md|toml|yaml|yml|env|prisma|sql)$/.test(name);
++	}
++
++	private async callClaude(task: string, codebase: string): Promise<IAgentBrief> {
++		const apiKey = this.getApiKey();
++		if (!apiKey) {
++			throw new Error('No Anthropic API key configured. Add it in Settings → Indent → API Key.');
++		}
++
++		const systemPrompt = `You are Indent's agent — a precise, confident coding assistant embedded in the Indent IDE.
++
++You will receive a task and a snapshot of the user's codebase. Your job:
++1. Read the codebase carefully.
++2. Think through multiple approaches internally.
++3. Pick the best one.
++4. Return a JSON brief ONLY — no prose, no markdown fences.
++
++The JSON must match this exact shape:
++{
++  "files": [{ "path": "relative/path/to/file.ts", "reason": "one line reason" }],
++  "totalChanges": <number>,
++  "commendation": "<optional honest observation about the codebase, or omit key>",
++  "rawPlan": "<your full internal plan as a string>"
++}
++
++Rules:
++- Be honest. If the codebase is messy, note it briefly. If it's solid, say so.
++- Never touch files you don't need to.
++- commendation should feel like a senior dev speaking — direct, not flattering.
++- rawPlan is for execution later, be thorough there.`;
++
++		const userMessage = `Task: ${task}\n\nCodebase:\n${codebase}`;
++
++		const response = await fetch(CLAUDE_API_URL, {
++			method: 'POST',
++			headers: {
++				'Content-Type': 'application/json',
++				'x-api-key': apiKey,
++				'anthropic-version': '2023-06-01',
++			},
++			body: JSON.stringify({
++				model: CLAUDE_MODEL,
++				max_tokens: 1024,
++				system: systemPrompt,
++				messages: [{ role: 'user', content: userMessage }],
++			}),
++		});
++
++		if (!response.ok) {
++			const err = await response.text();
++			throw new Error(`Claude API error ${response.status}: ${err}`);
++		}
++
++		const data = await response.json() as { content: Array<{ type: string; text: string }> };
++		const text = data.content.find(b => b.type === 'text')?.text ?? '';
++
++		try {
++			return JSON.parse(text) as IAgentBrief;
++		} catch {
++			throw new Error('Agent returned malformed plan. Try again.');
++		}
++	}
++
++	async executePlan(_brief: IAgentBrief): Promise<void> {
++		// Phase 2: actual file writes + git push
++		// For now: signal done so the UI resets cleanly
++		await new Promise(r => setTimeout(r, 1200));
++	}
++
++	private getApiKey(): string {
++		// Reads from VS Code settings: indent.apiKey
++		// Set via Settings → Indent → API Key
++		try {
++			const val = (globalThis as Record<string, unknown>)['indentApiKey'];
++			return typeof val === 'string' ? val : '';
++		} catch {
++			return '';
++		}
++	}
++}
+diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dddddddddddddddddddddddddddddddddddddddd
+--- /dev/null
++++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts
+@@ -0,0 +1,47 @@
++/*---------------------------------------------------------------------------------------------
++ *  Indent – Task Mode workbench contribution
++ *--------------------------------------------------------------------------------------------*/
++
++import { Registry } from '../../../../platform/registry/common/registry.js';
++import { Extensions as ViewExtensions, IViewsRegistry } from '../../../services/views/common/views.js';
++import { INDENT_AGENT_VIEW_ID, INDENT_AGENT_CONTAINER_ID } from './indentAgentConstants.js';
++import { IndentAgentViewPane } from './indentAgentViewPane.js';
++import { localize } from '../../../../nls.js';
++import { ViewContainer, Extensions as ViewContainerExtensions, IViewContainersRegistry, ViewContainerLocation } from '../../../common/views.js';
++import { Codicon } from '../../../../base/common/codicons.js';
++import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js';
++import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
++import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
++
++const indentAgentIcon = registerIcon(
++	'indent-agent-view',
++	Codicon.sparkle,
++	localize('indentAgentIcon', 'Indent Task Mode icon'),
++);
++
++const VIEW_CONTAINER: ViewContainer = Registry.as<IViewContainersRegistry>(ViewContainerExtensions.ViewContainersRegistry).registerViewContainer(
++	{
++		id: INDENT_AGENT_CONTAINER_ID,
++		title: { value: localize('indentTask', 'Task'), original: 'Task' },
++		icon: indentAgentIcon,
++		order: 6,
++		ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [INDENT_AGENT_CONTAINER_ID, { mergeViewWithContainerWhenSingleView: true }]),
++		hideIfEmpty: false,
++	},
++	ViewContainerLocation.Sidebar,
++	{ doNotRegisterOpenCommand: false, isDefault: false },
++);
++
++Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews(
++	[
++		{
++			id: INDENT_AGENT_VIEW_ID,
++			name: { value: localize('taskMode', 'Task Mode'), original: 'Task Mode' },
++			containerIcon: indentAgentIcon,
++			ctorDescriptor: new SyncDescriptor(IndentAgentViewPane),
++			canToggleVisibility: false,
++			canMoveView: false,
++			weight: 100,
++		},
++	],
++	VIEW_CONTAINER,
++);
+diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
+index 987c9597516278c9fcf10d963a0592ce1384ab93..eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee 100644
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -198,6 +198,9 @@ import './contrib/mcp/electron-browser/mcp.contribution.js';
+ // Keybindings Export
+ import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribution.js';
+ 
++// Indent – Task Mode
++import './contrib/indentAgent/browser/indentAgent.contribution.js';
++
+ //#endregion
+ 
+ 
