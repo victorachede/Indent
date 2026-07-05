@@ -1,6 +1,5 @@
 diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 --- /dev/null
 +++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentConstants.ts
 @@ -0,0 +1,8 @@
@@ -14,17 +13,15 @@ index 0000000000000000000000000000000000000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 +export const INDENT_AGENT_RESULT_EVENT = 'indent.agent.result';
 diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 --- /dev/null
 +++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentViewPane.ts
-@@ -0,0 +1,285 @@
+@@ -0,0 +1,185 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Indent – Task Mode view pane
 + *  Input at bottom, status flickers above it, brief fills the space above that.
 + *--------------------------------------------------------------------------------------------*/
 +
 +import { $, append, clearNode } from '../../../../base/browser/dom.js';
-+import { Disposable } from '../../../../base/common/lifecycle.js';
 +import { IViewPaneOptions, ViewPane } from '../../../browser/parts/views/viewPane.js';
 +import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
 +import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
@@ -36,7 +33,7 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 +import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
 +import { IHoverService } from '../../../../platform/hover/browser/hover.js';
-+import { IndentAgentService } from './indentAgentService.js';
++import { IndentAgentService, IAgentBrief } from './indentAgentService.js';
 +
 +const STATUS_MESSAGES = [
 +	'reading codebase',
@@ -55,9 +52,8 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +	private textarea!: HTMLTextAreaElement;
 +	private submitBtn!: HTMLButtonElement;
 +
-+	private agentService: IndentAgentService;
++	private agentService!: IndentAgentService;
 +	private statusInterval: ReturnType<typeof setInterval> | undefined;
-+	private currentTask = '';
 +	private isRunning = false;
 +
 +	constructor(
@@ -74,23 +70,20 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +		@IHoverService hoverService: IHoverService,
 +	) {
 +		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, telemetryService, hoverService);
-+		this.agentService = instantiationService.createInstance(IndentAgentService);
 +	}
 +
 +	protected override renderBody(container: HTMLElement): void {
 +		super.renderBody(container);
 +		this.container = container;
++		this.agentService = this._register(this.instantiationService.createInstance(IndentAgentService));
 +		container.classList.add('indent-agent-pane');
 +
-+		// Brief area — fills available space above input
 +		this.briefArea = append(container, $('.indent-agent-brief'));
 +		this.briefArea.setAttribute('aria-live', 'polite');
 +
-+		// Status line — single flickering line just above input
 +		this.statusLine = append(container, $('.indent-agent-status'));
 +		this.statusLine.textContent = '';
 +
-+		// Input wrapper — anchored to bottom
 +		this.inputWrapper = append(container, $('.indent-agent-input-wrapper'));
 +
 +		this.textarea = append(this.inputWrapper, $('textarea.indent-agent-input')) as HTMLTextAreaElement;
@@ -105,7 +98,7 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +		this._register(this.agentService.onStatusUpdate(msg => this.setStatus(msg)));
 +		this._register(this.agentService.onBriefReady(brief => this.showBrief(brief)));
 +		this._register(this.agentService.onError(err => this.showError(err)));
-
++
 +		this.textarea.addEventListener('keydown', (e) => {
 +			if (e.key === 'Enter' && !e.shiftKey) {
 +				e.preventDefault();
@@ -119,7 +112,6 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +	private runTask(): void {
 +		const task = this.textarea.value.trim();
 +		if (!task || this.isRunning) { return; }
-+		this.currentTask = task;
 +		this.isRunning = true;
 +		this.textarea.disabled = true;
 +		this.submitBtn.disabled = true;
@@ -146,9 +138,6 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +
 +	private setStatus(msg: string): void {
 +		this.statusLine.textContent = msg;
-+		this.statusLine.classList.remove('indent-status-fade');
-+		void this.statusLine.offsetWidth; // reflow to restart animation
-+		this.statusLine.classList.add('indent-status-fade');
 +	}
 +
 +	private showBrief(brief: IAgentBrief): void {
@@ -156,7 +145,6 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +		this.setStatus('');
 +		clearNode(this.briefArea);
 +
-+		// File list
 +		const fileList = append(this.briefArea, $('.indent-brief-files'));
 +		const header = append(fileList, $('.indent-brief-header'));
 +		header.textContent = `${brief.files.length} file${brief.files.length !== 1 ? 's' : ''}  ·  ${brief.totalChanges} change${brief.totalChanges !== 1 ? 's' : ''}`;
@@ -169,13 +157,11 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +			reason.textContent = f.reason;
 +		}
 +
-+		// Commendation if present
 +		if (brief.commendation) {
 +			const note = append(this.briefArea, $('.indent-brief-commendation'));
 +			note.textContent = brief.commendation;
 +		}
-
-+		// Action buttons
++
 +		const actions = append(this.briefArea, $('.indent-brief-actions'));
 +
 +		const editBtn = append(actions, $('button.indent-brief-btn-secondary')) as HTMLButtonElement;
@@ -225,26 +211,17 @@ index 0000000000000000000000000000000000000000..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 +
 +	override dispose(): void {
 +		this.stopStatusFlicker();
-+		this.agentService.dispose();
 +		super.dispose();
 +	}
 +}
-+
-+export interface IAgentBrief {
-+	files: Array<{ path: string; reason: string }>;
-+	totalChanges: number;
-+	commendation?: string;
-+	rawPlan: string;
-+}
 diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccccccccccc
 --- /dev/null
 +++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgentService.ts
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,155 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Indent – Agent service
-+ *  Talks to the Claude API, reads workspace files, builds the brief.
++ *  Talks to Claude API, reads workspace files, builds the brief.
 + *--------------------------------------------------------------------------------------------*/
 +
 +import { Disposable } from '../../../../base/common/lifecycle.js';
@@ -252,13 +229,18 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 +import { IFileService } from '../../../../platform/files/common/files.js';
 +import { URI } from '../../../../base/common/uri.js';
-+import { VSBuffer } from '../../../../base/common/buffer.js';
-+import { IAgentBrief } from './indentAgentViewPane.js';
 +
 +const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 +const CLAUDE_MODEL = 'claude-sonnet-4-6';
-+const MAX_FILE_BYTES = 80_000; // ~80kb per file to stay within context
++const MAX_FILE_BYTES = 80000;
 +const MAX_FILES = 20;
++
++export interface IAgentBrief {
++	files: Array<{ path: string; reason: string }>;
++	totalChanges: number;
++	commendation?: string;
++	rawPlan: string;
++}
 +
 +export class IndentAgentService extends Disposable {
 +
@@ -282,10 +264,8 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +		try {
 +			this._onStatusUpdate.fire('reading codebase');
 +			const codebaseSnapshot = await this.readWorkspaceFiles();
-+
 +			this._onStatusUpdate.fire('planning');
 +			const brief = await this.callClaude(task, codebaseSnapshot);
-+
 +			this._onBriefReady.fire(brief);
 +		} catch (err: unknown) {
 +			const msg = err instanceof Error ? err.message : String(err);
@@ -296,11 +276,9 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +	private async readWorkspaceFiles(): Promise<string> {
 +		const folders = this.workspaceService.getWorkspace().folders;
 +		if (!folders.length) { return '(no workspace open)'; }
-+
 +		const root = folders[0].uri;
 +		const files = await this.collectFiles(root, 0);
 +		const parts: string[] = [];
-+
 +		for (const uri of files.slice(0, MAX_FILES)) {
 +			try {
 +				const content = await this.fileService.readFile(uri);
@@ -311,7 +289,6 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +				// skip unreadable files
 +			}
 +		}
-+
 +		return parts.join('\n\n');
 +	}
 +
@@ -340,38 +317,26 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +	}
 +
 +	private isSourceFile(name: string): boolean {
-+		return /\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|css|scss|html|json|md|toml|yaml|yml|env|prisma|sql)$/.test(name);
++		return /\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|css|scss|html|json|md|toml|yaml|yml|prisma|sql)$/.test(name);
 +	}
 +
 +	private async callClaude(task: string, codebase: string): Promise<IAgentBrief> {
 +		const apiKey = this.getApiKey();
 +		if (!apiKey) {
-+			throw new Error('No Anthropic API key configured. Add it in Settings → Indent → API Key.');
++			throw new Error('No Anthropic API key set. Go to Settings → Indent → API Key.');
 +		}
 +
-+		const systemPrompt = `You are Indent's agent — a precise, confident coding assistant embedded in the Indent IDE.
-+
-+You will receive a task and a snapshot of the user's codebase. Your job:
-+1. Read the codebase carefully.
-+2. Think through multiple approaches internally.
-+3. Pick the best one.
-+4. Return a JSON brief ONLY — no prose, no markdown fences.
-+
-+The JSON must match this exact shape:
++		const systemPrompt = `You are Indent's agent — a precise, confident coding assistant.
++You will receive a task and a codebase snapshot.
++Think through multiple approaches internally. Pick the best one.
++Return ONLY valid JSON matching this exact shape, no prose, no markdown:
 +{
-+  "files": [{ "path": "relative/path/to/file.ts", "reason": "one line reason" }],
++  "files": [{ "path": "relative/path", "reason": "one line" }],
 +  "totalChanges": <number>,
-+  "commendation": "<optional honest observation about the codebase, or omit key>",
-+  "rawPlan": "<your full internal plan as a string>"
++  "commendation": "<optional honest codebase observation, omit key if nothing to say>",
++  "rawPlan": "<your full plan>"
 +}
-+
-+Rules:
-+- Be honest. If the codebase is messy, note it briefly. If it's solid, say so.
-+- Never touch files you don't need to.
-+- commendation should feel like a senior dev speaking — direct, not flattering.
-+- rawPlan is for execution later, be thorough there.`;
-+
-+		const userMessage = `Task: ${task}\n\nCodebase:\n${codebase}`;
++Be direct. If the codebase is solid say so. If it needs work say that too.`;
 +
 +		const response = await fetch(CLAUDE_API_URL, {
 +			method: 'POST',
@@ -384,13 +349,12 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +				model: CLAUDE_MODEL,
 +				max_tokens: 1024,
 +				system: systemPrompt,
-+				messages: [{ role: 'user', content: userMessage }],
++				messages: [{ role: 'user', content: `Task: ${task}\n\nCodebase:\n${codebase}` }],
 +			}),
 +		});
 +
 +		if (!response.ok) {
-+			const err = await response.text();
-+			throw new Error(`Claude API error ${response.status}: ${err}`);
++			throw new Error(`Claude API ${response.status}: ${await response.text()}`);
 +		}
 +
 +		const data = await response.json() as { content: Array<{ type: string; text: string }> };
@@ -399,19 +363,15 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +		try {
 +			return JSON.parse(text) as IAgentBrief;
 +		} catch {
-+			throw new Error('Agent returned malformed plan. Try again.');
++			throw new Error('Agent returned a malformed plan. Try again.');
 +		}
 +	}
 +
 +	async executePlan(_brief: IAgentBrief): Promise<void> {
-+		// Phase 2: actual file writes + git push
-+		// For now: signal done so the UI resets cleanly
-+		await new Promise(r => setTimeout(r, 1200));
++		await new Promise<void>(r => setTimeout(r, 1200));
 +	}
 +
 +	private getApiKey(): string {
-+		// Reads from VS Code settings: indent.apiKey
-+		// Set via Settings → Indent → API Key
 +		try {
 +			const val = (globalThis as Record<string, unknown>)['indentApiKey'];
 +			return typeof val === 'string' ? val : '';
@@ -422,10 +382,9 @@ index 0000000000000000000000000000000000000000..cccccccccccccccccccccccccccccccc
 +}
 diff --git a/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts b/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..dddddddddddddddddddddddddddddddddddddddd
 --- /dev/null
 +++ b/src/vs/workbench/contrib/indentAgent/browser/indentAgent.contribution.ts
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,44 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Indent – Task Mode workbench contribution
 + *--------------------------------------------------------------------------------------------*/
@@ -475,16 +434,14 @@ index 0000000000000000000000000000000000000000..dddddddddddddddddddddddddddddddd
 +	VIEW_CONTAINER,
 +);
 diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
-index 987c9597516278c9fcf10d963a0592ce1384ab93..eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee 100644
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
-@@ -198,6 +198,9 @@ import './contrib/mcp/electron-browser/mcp.contribution.js';
- // Keybindings Export
- import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribution.js';
+@@ -198,6 +198,9 @@ import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribut
+ 
+ //#endregion
  
 +// Indent – Task Mode
 +import './contrib/indentAgent/browser/indentAgent.contribution.js';
 +
- //#endregion
  
- 
+ export { main } from './electron-browser/desktop.main.js';
