@@ -30,3 +30,4 @@ index 948c6b4..66ecdd3 100644
  		const emit = util.streamToPromise(srcPipe
 -			.pipe(mangleStream)
  			.pipe(generator.stream)
+ 
