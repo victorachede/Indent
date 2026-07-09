@@ -2,7 +2,7 @@ diff --git a/build/lib/compilation.ts b/build/lib/compilation.ts
 index 948c6b4..66ecdd3 100644
 --- a/build/lib/compilation.ts
 +++ b/build/lib/compilation.ts
-@@ -131,27 +131,3 @@ export function compileTask(src: string, out: string, build: boolean, options: {
+@@ -139,29 +139,3 @@ export function compileTask(src: string, out: string, build: boolean, options: {
  
 -		// mangle: TypeScript to TypeScript
 -		let mangleStream = es.through();
@@ -27,6 +27,6 @@ index 948c6b4..66ecdd3 100644
 -			});
 -		}
 -
- 		return srcPipe
+ 		const emit = util.streamToPromise(srcPipe
 -			.pipe(mangleStream)
  			.pipe(generator.stream)
