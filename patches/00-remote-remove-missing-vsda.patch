@@ -126,3 +126,4 @@ index 269cc38..a53fca9 100644
 -	});
 +	const vsdaMod = instantiationService.invokeFunction(() => null);
  
+ 
