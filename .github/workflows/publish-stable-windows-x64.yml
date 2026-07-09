@@ -1,0 +1,193 @@
+name: Publish - Stable - Windows x64 (Simple)
+
+on:
+  workflow_dispatch: {}
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  APP_NAME: Indent
+  ASSETS_REPOSITORY: ${{ github.repository }}
+  BINARY_NAME: indent
+  GH_REPO_PATH: ${{ github.repository }}
+  GITHUB_BRANCH: main
+  ORG_NAME: ${{ github.repository_owner }}
+  OS_NAME: windows
+  VERSIONS_REPOSITORY: ${{ github.repository_owner }}/Indent-versions
+  VSCODE_QUALITY: stable
+  SHOULD_BUILD_REH: "no"
+  SHOULD_BUILD_REH_WEB: "no"
+  SHOULD_DEPLOY: "yes"
+  VSCODE_ARCH: x64
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      MS_COMMIT: ${{ env.MS_COMMIT }}
+      MS_TAG: ${{ env.MS_TAG }}
+      RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+      SHOULD_BUILD: ${{ env.SHOULD_BUILD }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ env.GITHUB_BRANCH }}
+          persist-credentials: true
+
+      - name: Clone VSCode repo
+        run: ./get_repo.sh
+
+      - name: Check existing Indent tags/releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHECK_ALL: 'yes'
+        run: ./check_tags.sh
+
+  compile:
+    needs:
+      - check
+    runs-on: windows-2022
+    permissions: {}
+    defaults:
+      run:
+        shell: bash
+    env:
+      MS_COMMIT: ${{ needs.check.outputs.MS_COMMIT }}
+      MS_TAG: ${{ needs.check.outputs.MS_TAG }}
+      RELEASE_VERSION: ${{ needs.check.outputs.RELEASE_VERSION }}
+      SHOULD_BUILD: ${{ needs.check.outputs.SHOULD_BUILD }}
+      VSCODE_ARCH: x64
+    outputs:
+      BUILD_SOURCEVERSION: ${{ env.BUILD_SOURCEVERSION }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ env.GITHUB_BRANCH }}
+          persist-credentials: true
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .nvmrc
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Setup Python 3
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Clone VSCode repo
+        run: ./get_repo.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Build
+        env:
+          SHOULD_BUILD_REH: no
+          SHOULD_BUILD_REH_WEB: no
+        run: ./build.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Compress vscode artifact
+        run: |
+          find vscode -type f -not -path "*/node_modules/*" -not -path "vscode/.build/node/*" -not -path "vscode/.git/*" > vscode.txt
+          echo "vscode/.build/extensions/node_modules" >> vscode.txt
+          echo "vscode/.git" >> vscode.txt
+          tar -czf vscode.tar.gz -T vscode.txt
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Upload vscode artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: vscode
+          path: ./vscode.tar.gz
+          retention-days: 30
+        if: env.SHOULD_BUILD == 'yes'
+
+  build:
+    needs:
+      - check
+      - compile
+    runs-on: windows-2022
+    environment: publish-windows
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_SOURCEVERSION: ${{ needs.compile.outputs.BUILD_SOURCEVERSION }}
+      MS_COMMIT: ${{ needs.check.outputs.MS_COMMIT }}
+      MS_TAG: ${{ needs.check.outputs.MS_TAG }}
+      RELEASE_VERSION: ${{ needs.check.outputs.RELEASE_VERSION }}
+      SHOULD_BUILD: ${{ needs.check.outputs.SHOULD_BUILD }}
+      VSCODE_ARCH: x64
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ env.GITHUB_BRANCH }}
+          persist-credentials: true
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: '.nvmrc'
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Setup Python 3
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Install WiX Toolset
+        run: choco install wixtoolset -y
+        shell: cmd
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Check existing Indent tags/releases
+        env:
+          DISABLE_MSI: 'no'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./check_tags.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Download vscode artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: vscode
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_arch: x64
+          npm_config_target_arch: x64
+        run: ./build/windows/package.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Prepare assets
+        run: ./prepare_assets.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Prepare checksums
+        run: ./prepare_checksums.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./release.sh
+        if: env.SHOULD_BUILD == 'yes'
+
+      - name: Update versions repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.STRONGER_GITHUB_TOKEN }}
+          GITHUB_USERNAME: ${{ github.repository_owner }}
+        run: ./update_version.sh
+        if: env.SHOULD_BUILD == 'yes'
