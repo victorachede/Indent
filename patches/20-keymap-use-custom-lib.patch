@@ -129,3 +129,4 @@ index 8950ce21..f31cea62 100644
 -		const nativeKeymapMod = await import('native-keymap');
 +		const nativeKeymapMod = await import('@vscodium/native-keymap');
  
+ 
