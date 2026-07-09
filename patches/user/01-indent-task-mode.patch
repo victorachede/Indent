@@ -445,3 +445,4 @@ diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workb
 +
  
  export { main } from './electron-browser/desktop.main.js';
+ 
