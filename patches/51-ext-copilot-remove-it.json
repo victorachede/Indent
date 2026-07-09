@@ -40,7 +40,6 @@
       "src/vs/platform/agentHost/test/node/claudeSubagentSignals.test.ts",
       "src/vs/platform/agentHost/test/node/anthropicBetas.test.ts",
       "src/vs/platform/agentHost/test/node/claudeInteractiveTools.test.ts",
-      "src/vs/platform/agentHost/test/node/claudeMaterializer.test.ts",
       "src/vs/platform/agentHost/test/node/claudeModelId.test.ts",
       "src/vs/platform/agentHost/test/node/claudeProxyAuth.test.ts",
       "src/vs/platform/agentHost/test/node/claudeSubagentRegistry.test.ts",
