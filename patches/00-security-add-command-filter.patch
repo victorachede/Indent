@@ -165,3 +165,4 @@ index ca3be11..fb456a3 100644
 -		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService()));
 +		const service = store.add(new CommandService(new InstantiationService(), extensionService, new NullLogService(), nullConfigService, new TestDialogService()));
  
+ 
