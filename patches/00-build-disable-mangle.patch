@@ -31,3 +31,4 @@ index 948c6b4..66ecdd3 100644
 -			.pipe(mangleStream)
  			.pipe(generator.stream)
  
+ 
