@@ -436,7 +436,10 @@ new file mode 100644
 diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
 --- a/src/vs/workbench/workbench.desktop.main.ts
 +++ b/src/vs/workbench/workbench.desktop.main.ts
-@@ -198,6 +198,9 @@ import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribut
+@@ -205,8 +205,11 @@ import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribut
+ 
+ // System-wide (OS global) Keybindings
+ import './contrib/keybindings/electron-browser/systemWideKeybindings.contribution.js';
  
  //#endregion
  
