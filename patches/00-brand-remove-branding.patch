@@ -103,10 +103,11 @@ diff --git a/extensions/extension-editing/src/extensionLinter.ts b/extensions/ex
 index 6249500e..6d89804e 100644
 --- a/extensions/extension-editing/src/extensionLinter.ts
 +++ b/extensions/extension-editing/src/extensionLinter.ts
-@@ -34,3 +34,3 @@ const relativeUrlRequiresHttpsRepository = l10n.t("Relative image URLs require a
+@@ -35,4 +35,4 @@ const relativeUrlRequiresHttpsRepository = l10n.t("Relative image URLs require a
  const relativeBadgeUrlRequiresHttpsRepository = l10n.t("Relative badge URLs require a repository with HTTPS protocol to be specified in this package.json.");
 -const apiProposalNotListed = l10n.t("This proposal cannot be used because for this extension the product defines a fixed set of API proposals. You can test your extension but before publishing you MUST reach out to the VS Code team.");
 +const apiProposalNotListed = l10n.t("This proposal cannot be used because for this extension the product defines a fixed set of API proposals. You can test your extension but before publishing you MUST reach out to the !!APP_NAME!! team.");
+ const apiProposalVersionNotSupported = l10n.t("API proposal versions are no longer supported. Remove the '@<version>' suffix.");
  
 diff --git a/extensions/git/package.nls.json b/extensions/git/package.nls.json
 index 147a75f9..565109ec 100644
@@ -640,18 +641,6 @@ index 6eefd716..e6cafc5d 100644
 -					throw new Error(nls.localize('restartCode', "Please restart VS Code before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
 +					throw new Error(nls.localize('restartCode', "Please restart !!APP_NAME!! before reinstalling {0}.", this.manifest.displayName || this.manifest.name));
  				}
-diff --git a/src/vs/platform/extensions/common/extensionValidator.ts b/src/vs/platform/extensions/common/extensionValidator.ts
-index 6346b9d4..77ff0f91 100644
---- a/src/vs/platform/extensions/common/extensionValidator.ts
-+++ b/src/vs/platform/extensions/common/extensionValidator.ts
-@@ -380,5 +380,5 @@ export function areApiProposalsCompatible(apiProposals: string[], arg1?: string[
- 			if (incompatibleProposals.length === 1) {
--				notices.push(nls.localize('apiProposalMismatch1', "This extension is using the API proposal '{0}' that is not compatible with the current version of VS Code.", incompatibleProposals[0]));
-+				notices.push(nls.localize('apiProposalMismatch1', "This extension is using the API proposal '{0}' that is not compatible with the current version of !!APP_NAME!!.", incompatibleProposals[0]));
- 			} else {
--				notices.push(nls.localize('apiProposalMismatch2', "This extension is using the API proposals {0} and '{1}' that are not compatible with the current version of VS Code.",
-+				notices.push(nls.localize('apiProposalMismatch2', "This extension is using the API proposals {0} and '{1}' that are not compatible with the current version of !!APP_NAME!!.",
- 					incompatibleProposals.slice(0, incompatibleProposals.length - 1).map(p => `'${p}'`).join(', '),
 diff --git a/src/vs/platform/externalTerminal/node/externalTerminalService.ts b/src/vs/platform/externalTerminal/node/externalTerminalService.ts
 index e7cf3f54..4424cc7f 100644
 --- a/src/vs/platform/externalTerminal/node/externalTerminalService.ts
