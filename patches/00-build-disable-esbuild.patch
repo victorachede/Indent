@@ -6,4 +6,3 @@ index a4299d26..a815dd51 100644
   */
 -export const useEsbuildTranspile = true;
 +export const useEsbuildTranspile = false;
- 
